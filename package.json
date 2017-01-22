@@ -1,5 +1,5 @@
 {
-  "name": "kewtjs",
+  "name": "kewt.js",
   "version": "0.0.1",
   "description": "work queues for humans",
   "main": "kewt.js",
