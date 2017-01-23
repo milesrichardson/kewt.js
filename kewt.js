@@ -245,6 +245,7 @@ Kewt.prototype._singleWorkerPromise = function(worker, workerId) {
     .then(function() {
         var successPromises = [];
         if (retryNum !== undefined) {
+            successPromises.push(kewt.log("move from doing " + itemWithRetryString));
             successPromises.push(client.lremAsync(kewt.queues.doing, -1, itemWithRetryString));
         } else {
             successPromises.push(client.lremAsync(kewt.queues.doing, -1, item));
@@ -266,7 +267,14 @@ Kewt.prototype._singleWorkerPromise = function(worker, workerId) {
         }
     })
     .catch(kewt.WorkerCallbackError, function(e) {
-        return client.lremAsync(kewt.queues.doing, -1, item)
+        var moveFromDoingPromise;
+        if (retryNum !== undefined) {
+            moveFromDoingPromise = client.lremAsync(kewt.queues.doing, -1, itemWithRetryString)
+        } else {
+            moveFromDoingPromise = client.lremAsync(kewt.queues.doing, -1, item)
+        }
+
+        return moveFromDoingPromise
         .then(function() {
             if (kewt.opts.traceErrors && e.wrappedErr.hasOwnProperty('stack')) {
                 return kewt.logerror(e.wrappedErr.stack)
