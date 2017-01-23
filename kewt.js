@@ -214,6 +214,7 @@ Kewt.prototype._singleWorkerPromise = function(worker, workerId) {
     var client = kewt.client;
     var item = undefined;
     var retryNum = undefined;
+    var itemWithRetryString = undefined;
 
     return Promise.resolve()
     .then(function() {
@@ -229,6 +230,7 @@ Kewt.prototype._singleWorkerPromise = function(worker, workerId) {
         item = poppedItem;
 
         if (worker.queueName == kewt.queues.retry) {
+            itemWithRetryString = (' ' + item).slice(1);
             retryNum = parseInt(item.split(':retry:')[1]) || 0;
             item = item.split(':retry:')[0];
         }
@@ -242,7 +244,11 @@ Kewt.prototype._singleWorkerPromise = function(worker, workerId) {
     })
     .then(function() {
         var successPromises = [];
-        successPromises.push(client.lremAsync(kewt.queues.doing, -1, item));
+        if (retryNum !== undefined) {
+            successPromises.push(client.lremAsync(kewt.queues.doing, -1, itemWithRetryString));
+        } else {
+            successPromises.push(client.lremAsync(kewt.queues.doing, -1, item));
+        }
         successPromises.push(client.rpushAsync(kewt.queues.done, item));
         successPromises.push(kewt.log("" + item + ": success"));
 
