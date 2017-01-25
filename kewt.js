@@ -19,8 +19,13 @@ var Kewt = function(namespace, opts) {
     try {
         sysOpts = this._parseSysArgs(process.argv);
     } catch(e) {
-        console.error('Error:', 'Could not parse args');
-        process.exit(1);
+        console.warn('Warning:', 'Could not parse args');
+        sysOpts = {
+            isMaster: false,
+            isWorker: false,
+            isLogger: false
+        }
+        // process.exit(1);
     }
 
     this.isComplete = false;
@@ -141,6 +146,29 @@ Kewt.prototype.logerror = function(msg) {
     });
 };
 
+Kewt.prototype.getStats = function() {
+    var queues = [this.queues.todo, this.queues.retry, this.queues.done, this.queues.failed];
+
+    var self = this;
+
+    var stats = {};
+
+    return self.client.multi()
+    .llen(this.queues.todo)
+    .llen(this.queues.retry)
+    .llen(this.queues.done)
+    .llen(this.queues.failed)
+    .execAsync()
+    .then(function(queueLengths) {
+        stats[self.queues.todo] = queueLengths[0];
+        stats[self.queues.retry] = queueLengths[1];
+        stats[self.queues.done] = queueLengths[2];
+        stats[self.queues.failed] = queueLengths[3];
+
+        return Promise.resolve(stats);
+    })
+};
+
 Kewt.prototype.checkCompletion = function(completionCheckFunc) {
     this.callbacks.checkCompletion = completionCheckFunc;
 };
@@ -243,21 +271,15 @@ Kewt.prototype._singleWorkerPromise = function(worker, workerId) {
         }
     })
     .then(function() {
-        var successPromises = [];
-        if (retryNum !== undefined) {
-            successPromises.push(kewt.log("move from doing " + itemWithRetryString));
-            successPromises.push(client.lremAsync(kewt.queues.doing, -1, itemWithRetryString));
-        } else {
-            successPromises.push(client.lremAsync(kewt.queues.doing, -1, item));
-        }
-        successPromises.push(client.rpushAsync(kewt.queues.done, item));
-        successPromises.push(kewt.log("" + item + ": success"));
+        var itemToPush = (retryNum !== undefined) ? itemWithRetryString : item;
 
-        return Promise.all(successPromises)
-        .catch(function(e) {
-            console.warn("Warning: error in successPromises:" + e);
-            return Promise.resolve();
-        });
+        return kewt.client.multi()
+        .lrem(kewt.queues.doing, -1, itemToPush)
+        .rpush(kewt.queues.done, item)
+        .execAsync()
+        .then(function() {
+            return kewt.log("" + item + ": success")
+        })
     })
     .catch(function(e) {
         if (kewt._isKewtError(e)) {
