@@ -19,7 +19,7 @@ var Kewt = function(namespace, opts) {
     try {
         sysOpts = this._parseSysArgs(process.argv);
     } catch(e) {
-        console.warn('Warning:', 'Could not parse args');
+        // console.warn('Warning:', 'Could not parse args');
         sysOpts = {
             isMaster: false,
             isWorker: false,
@@ -56,7 +56,7 @@ var Kewt = function(namespace, opts) {
         port: (parseInt(process.env.REDIS_PORT) || 6379),
     };
 
-    console.log(redisOpts);
+    // console.log(redisOpts);
 
     this.client = redis.createClient(redisOpts);
 
