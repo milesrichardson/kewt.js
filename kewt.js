@@ -822,8 +822,6 @@ Kewt.prototype._parseSysArgs = function(argv) {
         throw "Invalid namespace"
     }
 
-    console.log(opts);
-
     return opts;
 }
 
