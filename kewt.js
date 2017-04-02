@@ -37,7 +37,8 @@ var Kewt = function(namespace, opts) {
 
     this.opts = {
         clearBeforeInit: true,
-        traceErrors: false
+        traceErrors: false,
+        pipeWorkers: false
     }
 
     if (typeof opts !== 'undefined') {
@@ -508,12 +509,25 @@ Kewt.prototype._recursivelyManageChildProcs = function(itern) {
 
             var cmd = process.argv[0];
             var args = [process.argv[1], 'worker', kewt.namespace, workerName, workerId];
-            var opts = {
-                stdio: 'ignore',
-                stdout: 'inherit'
-            };
+
+            if (!kewt.opts.pipeWorkers) {
+                var opts = {
+                    stdio: 'ignore',
+                    stdout: 'inherit'
+                };
+            }
 
             var workerProc = spawn(cmd, args, opts);
+
+            if (kewt.opts.pipeWorkers) {
+                workerProc.stdout.on('data', function(data) {
+                    console.log("[worker ", workerId.toString(), "] ", data.toString());
+                });
+
+                workerProc.stderr.on('data', function(data) {
+                    console.error("[worker ", workerId.toString(), "] ", data.toString());
+                });
+            }
 
             kewt.childprocs.workers[workerName].push(workerProc);
 
