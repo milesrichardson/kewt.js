@@ -38,7 +38,8 @@ var Kewt = function(namespace, opts) {
     this.opts = {
         clearBeforeInit: true,
         traceErrors: false,
-        pipeWorkers: false
+        pipeWorkers: false,
+        completionCallbackIsPromise: false
     }
 
     if (typeof opts !== 'undefined') {
@@ -170,8 +171,10 @@ Kewt.prototype.getStats = function() {
     })
 };
 
-Kewt.prototype.checkCompletion = function(completionCheckFunc) {
+Kewt.prototype.checkCompletion = function(completionCheckFunc, callbackIsPromise) {
+    if (typeof callbacks === "undefined") { callbackIsPromise = false; }
     this.callbacks.checkCompletion = completionCheckFunc;
+    this.opts.completionCallbackIsPromise = callbackIsPromise;
 };
 
 Kewt.prototype.init = function(initFunc) {
@@ -422,6 +425,8 @@ Kewt.prototype._queueLength = function(queue) {
 Kewt.prototype._checkForCompletion = function() {
     var kewt = this;
 
+    var callbackIsPromise = this.opts.completionCallbackIsPromise;
+
     var queueLengths = {
         todo: undefined,
         retry: undefined,
@@ -447,17 +452,22 @@ Kewt.prototype._checkForCompletion = function() {
     lengthPromises.push(fillQueueLengthPromise(kewt.queues.done, 'done'));
     lengthPromises.push(fillQueueLengthPromise(kewt.queues.failed, 'failed'));
 
+
     return Promise.all(lengthPromises)
     .then(function() {
 
-        var isComplete = false;
+        var isComplete = false
 
-        if (kewt.callbacks.checkCompletion !== undefined) {
-            isComplete = kewt.callbacks.checkCompletion(kewt, queueLengths);
-        } else {
+        if (kewt.callbacks.checkCompletion === undefined) {
             isComplete = (queueLengths.todo == 0 && queueLengths.retry == 0);
+            return Promise.resolve(isComplete);
+        } else if (!callbackIsPromise) {
+            isComplete = kewt.callbacks.checkCompletion(kewt, queueLengths);
+            return Promise.resolve(isComplete);
+        } else {
+            return kewt.callbacks.checkCompletion(kewt, queueLengths);
         }
-
+    }).then(function(isComplete) {
         if (isComplete) {
             kewt.endTime = new moment();
             var duration = kewt.endTime.diff(kewt.startTime, 'seconds');
